@@ -160,7 +160,7 @@ project=SPD AND created > "2023-04-30"
 
 ---
 
-# 🇬🇧 **Jira Task Analytics (Python + SQL)**
+# ENG **Jira Task Analytics (Python + SQL)**
 
 ## 📌 Project Overview
 
