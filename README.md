@@ -1,122 +1,315 @@
-# Theme Statistic & First Chat Analyzer — SQL Pipeline  
-### RU 🇷🇺 | EN 🇺🇸
+Отлично!
+Сейчас я соберу тебе **полный красивый README**, **сразу в двух версиях**:
+
+* 🇷🇺 **Русская версия**
+* 🇬🇧 **English version**
+
+Ты просто копируешь и вставляешь в GitHub.
+
+Хочешь — можно будет добавить картинки, схемы, badges, архитектуру и т. д.
 
 ---
 
-## 🇷🇺 Описание проекта
+# 🇷🇺 **README — Аналитика задач в JIRA (Python + SQL)**
 
-Этот SQL-процесс строит две таблицы:
+## 📌 Описание проекта
 
-1. **theme_statistic**  
-   Используется для извлечения данных о консультациях, разборе текстового поля `consultation_desc` на отдельные колонки (`type`, `brand`, `provider`, `process`, `topic`, `subTopic`, `subTopic2`) и связывания консультаций с коммуникациями и чат-переписками.
+Этот проект автоматизирует процесс выгрузки, обработки и аналитики задач Jira для проекта **SPD**.
+В него входят два основных компонента:
 
-2. **first_chat_analiser**  
-   Построение таблицы, содержащей первый момент появления сообщения в чат-треде (по `chat_thread_rk`) за период.
+1. **Python-скрипт (`get_jira_task.py`)** — выгружает задачи из Jira и формирует таблицу сотрудников-репортеров.
+2. **SQL-скрипт (`checking-jira-tasks.sql`)** — производит многоступенчатую аналитику:
 
-Основная задача — получить чистые аналитические данные для последующей обработки, дэшбордов, статистики тем обращений и анализа чатов.
-
----
-
-## 🇷🇺 Логика работы SQL
-
-### 1. Создание таблицы `theme_statistic`
-- Удаляет таблицу, если такая уже существует.  
-- Создает новую таблицу на основе данных из:
-  - `prod_v_dds.consultation`
-  - `prod_v_dds.communication`
-  - `prod_v_dds.COMMUNICATION_X_CHAT_THREAD`
-  - `prod_v_dds.CHAT_THREAD`
-- Фильтрует консультации:
-  - тематика: `Auto.Travel.Partners`
-  - период: `2024-10-01` — `2024-11-01`
-- Распарсивает строковое поле `consultation_desc`, где данные хранятся в формате, напоминающем JSON.
-- Извлекает отдельные атрибуты: `type`, `brand`, `provider`, `order`, `process`, `topic`, `subTopic`, `subTopic2`.
-- Добавляет ключи коммуникации и идентификаторы тредов.
-
-### 2. Создание таблицы `first_chat_analiser`
-- Удаляет таблицу при наличии.
-- Создает таблицу с минимальным временем создания сообщения (`min(create_dttm)`) по каждому `chat_thread_rk`.
-- Используется таблица `prod_v_dds.CHAT_MESSAGE`.
+   * объединение данных Jira с оргструктурой,
+   * анализ закрытых задач,
+   * расчёт процента выполнения по департаментам и группам,
+   * аналитика открытых задач (Backlog, In Progress, Block).
 
 ---
 
-## 🇺🇸 Project Description
+# 🧩 1. Python-скрипт: `get_jira_task.py`
 
-This SQL pipeline generates two analytical tables:
+### Что делает:
 
-1. **theme_statistic**  
-   Parses consultation descriptions, extracts structured fields (`type`, `brand`, `provider`, `process`, `topic`, etc.), and joins consultation records with communication and chat-thread metadata.
+* Подключается к Jira через API.
+* Выполняет JQL-запрос:
 
-2. **first_chat_analiser**  
-   Builds a table containing the first message timestamp for each chat thread within the specified date range.
+```
+project=SPD AND created > "2023-04-30"
+```
 
-The goal is to prepare structured analytical data for reporting, dashboards, and chat topic analytics.
+* Для каждой задачи получает:
 
----
+  * ключ задачи,
+  * дату создания,
+  * тип,
+  * имя и email репортера,
+  * логин (часть email до "@").
+* Создаёт DataFrame `spd_tasks`.
+* Отправляет данные в хранилище GP.
 
-## 🇺🇸 SQL Logic Overview
+### 📊 Пример таблицы `spd_tasks`
 
-### 1. Creating `theme_statistic`
-- Drops the table if it already exists.  
-- Creates a new table based on:
-  - `prod_v_dds.consultation`
-  - `prod_v_dds.communication`
-  - `prod_v_dds.COMMUNICATION_X_CHAT_THREAD`
-  - `prod_v_dds.CHAT_THREAD`
-- Filters consultations by:
-  - subject: `Auto.Travel.Partners`
-  - date range: `2024-10-01` — `2024-11-01`
-- Parses the semi-JSON string `consultation_desc`.
-- Extracts components: `type`, `brand`, `provider`, `order`, `process`, `topic`, `subTopic`, `subTopic2`.
-- Adds communication keys and chat thread identifiers.
-
-### 2. Creating `first_chat_analiser`
-- Drops the table if it exists.
-- Creates a table with the earliest message timestamp (`min(create_dttm)`) for each `chat_thread_rk`.
-- Uses `prod_v_dds.CHAT_MESSAGE`.
+| issue     | creation_date       | issue_type | reporter       | email                                                 | login      |
+| --------- | ------------------- | ---------- | -------------- | ----------------------------------------------------- | ---------- |
+| SPD-12345 | 2023-05-12 14:33:01 | Bug        | Ivan Petrov    | [i.petrov@company.ru](mailto:i.petrov@company.ru)     | i.petrov   |
+| SPD-12346 | 2023-05-12 17:20:12 | TCRM Call  | Maria Smirnova | [smirnova.m@company.ru](mailto:smirnova.m@company.ru) | smirnova.m |
+| SPD-12347 | 2023-05-13 09:11:44 | Task       | Sergey Ivanov  | [s.ivanov@company.ru](mailto:s.ivanov@company.ru)     | s.ivanov   |
 
 ---
 
-## 📌 SQL Code (Used for This Pipeline)
+# 🧩 2. SQL-скрипт: `checking-jira-tasks.sql`
 
-```sql
-drop table if exists theme_statistic;
+## 2.1. Формирование полной таблицы закрытых задач
 
-create table theme_statistic as
-SELECT 
-    c.create_dttm::date,
-    consultation_rk,
-    consultation_desc,
-    trim(both from substring(split_part(consultation_desc,',',1), '"type":([ ()0-9A-zА-я"-]+)'), '"') AS type,
-    trim(both from substring(split_part(consultation_desc,',',2), '"brand":([ ()0-9A-zА-я"-]+)'), '"') AS brand,
-    trim(both from substring(split_part(consultation_desc,',',3), '"provider":([ ()0-9A-zА-я"-]+)'), '"') AS provider,
-    trim(both from substring(split_part(consultation_desc,',',4), '"order":([ ()0-9A-zА-я"-]+)'), '"') AS ord,
-    trim(both from substring(split_part(consultation_desc,',',5), '"process":([ ()0-9A-zА-я"-]+)'), '"') AS process,
-    trim(both from substring(split_part(consultation_desc,',',6), '"topic":([ () ()0-9A-zА-я"-]+)'), '"') AS topic,
-    trim(both from substring(split_part(consultation_desc,',',7), '"subTopic":([ ()0-9A-zА-я"-]+)'), '"') AS subTopic,
-    trim(both from substring(split_part(consultation_desc,',',8), '"subTopic2":([ ()0-9A-zА-я"-]+)'), '"') AS subTopic2,
-    c.communication_rk,
-    prod_v_dds.communication.communication_id,
-    prod_v_dds.communication.communication_method_cd,
-    prod_v_dds.communication.communication_direction_cd,
-    prod_v_dds.COMMUNICATION_X_CHAT_THREAD.chat_thread_rk,
-    prod_v_dds.CHAT_THREAD.chat_thread_id
-FROM prod_v_dds.consultation c, prod_v_dds.communication
-LEFT JOIN prod_v_dds.COMMUNICATION_X_CHAT_THREAD 
-    ON prod_v_dds.communication.communication_rk = prod_v_dds.COMMUNICATION_X_CHAT_THREAD.communication_rk
-LEFT JOIN prod_v_dds.CHAT_THREAD 
-    ON prod_v_dds.COMMUNICATION_X_CHAT_THREAD.chat_thread_rk = prod_v_dds.CHAT_THREAD.chat_thread_rk
-WHERE true
-    AND c.consultation_subject_dk = 'Auto.Travel.Partners'
-    AND c.create_dttm::date BETWEEN '2024-10-01' AND '2024-11-01'
-    AND c.communication_rk = prod_v_dds.communication.communication_rk;
+Создаётся таблица `spd_tasks_reporters_full`, где данные задач объединяются:
 
-drop table if exists first_chat_analiser;
+* со статусами Jira,
+* оргструктурой (management unit, lvl6, lvl8, legal unit),
+* датой решения задачи.
 
-create table first_chat_analiser as
-SELECT 
-    chat_thread_rk, 
-    min(create_dttm)
-FROM prod_v_dds.CHAT_MESSAGE
-WHERE create_dttm::date BETWEEN '2024-10-01' AND '2024-11-01'
-GROUP BY chat_thread_rk;
+### 📊 Пример таблицы
+
+| issue     | status_name | creation_date | resolution_dttm     | type_nm   | login      | management_unit_nm | lvl8_mngt_unit_nm | legal_unit_nm |
+| --------- | ----------- | ------------- | ------------------- | --------- | ---------- | ------------------ | ----------------- | ------------- |
+| SPD-12345 | Done        | 2023-05-12    | 2023-05-15 14:11:22 | TCRM Call | i.petrov   | Support Group 1    | Contact Center    | Tinkoff Bank  |
+| SPD-12346 | Done        | 2023-06-02    | 2023-06-03 09:17:44 | TCRM Call | smirnova.m | Support Group 3    | Digital Support   | Tinkoff Bank  |
+
+---
+
+## 2.2. Подсчёт закрытых задач по месяцам
+
+Таблица `spd_tasks_month`:
+
+| y    | mes_num | mes  | tasks_amount |
+| ---- | ------- | ---- | ------------ |
+| 2023 | 5       | May  | 412          |
+| 2023 | 6       | June | 398          |
+| 2023 | 7       | July | 450          |
+
+---
+
+## 2.3. Общая статистика по подразделениям
+
+Таблица `spd_tasks_full_count_data`
+
+| y    | mes_num | mes | lvl6_mngt_unit_nm | management_unit_nm | tasks_amount |
+| ---- | ------- | --- | ----------------- | ------------------ | ------------ |
+| 2023 | 5       | May | Digital Support   | Support Group 1    | 150          |
+| 2023 | 5       | May | Digital Support   | Support Group 3    | 120          |
+| 2023 | 5       | May | Contact Center    | Hotline Team       | 142          |
+
+---
+
+## 2.4. Процент закрытия задач по департаментам
+
+| y    | mes_num | mes | lvl6_mngt_unit_nm | tasks_amount | percentage |
+| ---- | ------- | --- | ----------------- | ------------ | ---------- |
+| 2023 | 5       | May | Digital Support   | 270          | 65.53%     |
+| 2023 | 5       | May | Contact Center    | 142          | 34.47%     |
+
+---
+
+## 2.5. Процент закрытия задач по группам
+
+| y    | mes_num | mes | management_unit_nm | tasks_amount | percentage |
+| ---- | ------- | --- | ------------------ | ------------ | ---------- |
+| 2023 | 5       | May | Support Group 1    | 150          | 36.4%      |
+| 2023 | 5       | May | Support Group 3    | 120          | 29.1%      |
+| 2023 | 5       | May | Hotline Team       | 142          | 34.4%      |
+
+---
+
+## 2.6. Аналитика открытых задач
+
+Таблица `spd_tasks_reporters_full_open` заполняется задачами, у которых статус:
+
+### Назначение main_status:
+
+| Jira статус                           | main_status |
+| ------------------------------------- | ----------- |
+| Ready for Specification, New, Backlog | Backlog     |
+| Development, Review, To Do            | In Progress |
+| Остальные                             | Block       |
+
+### 📊 Пример
+
+| issue     | status_name | main_status | creation_date | management_unit_nm |
+| --------- | ----------- | ----------- | ------------- | ------------------ |
+| SPD-12900 | Backlog     | Backlog     | 2024-02-01    | Support Group 2    |
+| SPD-12911 | Review      | In Progress | 2024-02-02    | Support Group 1    |
+| SPD-12913 | Blocked     | Block       | 2024-02-03    | Hotline Team       |
+
+---
+
+## 2.7. Подсчёт Backlog задач
+
+| mes | main_status | management_unit_nm | count |
+| --- | ----------- | ------------------ | ----- |
+| May | Backlog     | Support Group 1    | 23    |
+| May | Backlog     | Support Group 3    | 17    |
+
+---
+
+## 2.8. Подсчёт задач In Progress
+
+| mes | main_status | management_unit_nm | count |
+| --- | ----------- | ------------------ | ----- |
+| May | In Progress | Support Group 1    | 15    |
+| May | In Progress | Support Group 3    | 8     |
+
+---
+
+# 🚀 Итог
+
+Проект полностью автоматизирует:
+
+* сбор Jira-данных,
+* маппинг на оргструктуру,
+* подсчёт и анализ закрытых задач,
+* мониторинг открытых задач по статусам,
+* аналитическую отчётность для менеджмента.
+
+---
+
+# 🇬🇧 **README — Jira Task Analytics (Python + SQL)**
+
+## 📌 Project Overview
+
+This project automates the extraction, processing, and analysis of Jira tasks for the **SPD** project.
+It consists of two main parts:
+
+1. **Python script (`get_jira_task.py`)** — extracts tasks from Jira and builds a reporter dataset.
+2. **SQL script (`checking-jira-tasks.sql`)** — performs multi-level analytics:
+
+   * joining Jira data with org structure,
+   * closed task analytics,
+   * percent contribution by department and team,
+   * open task analytics (Backlog, In Progress, Block).
+
+---
+
+# 🧩 1. Python script: `get_jira_task.py`
+
+### What it does:
+
+* Connects to Jira API.
+* Executes:
+
+```
+project=SPD AND created > "2023-04-30"
+```
+
+* Extracts for each task:
+
+  * issue key,
+  * creation date,
+  * issue type,
+  * reporter's name and email,
+  * login (email prefix).
+* Builds a pandas DataFrame.
+* Uploads the table to GP storage.
+
+### 📊 Example DataFrame: `spd_tasks`
+
+| issue     | creation_date       | issue_type | reporter       | email                                                 | login      |
+| --------- | ------------------- | ---------- | -------------- | ----------------------------------------------------- | ---------- |
+| SPD-12345 | 2023-05-12 14:33:01 | Bug        | Ivan Petrov    | [i.petrov@company.ru](mailto:i.petrov@company.ru)     | i.petrov   |
+| SPD-12346 | 2023-05-12 17:20:12 | TCRM Call  | Maria Smirnova | [smirnova.m@company.ru](mailto:smirnova.m@company.ru) | smirnova.m |
+| SPD-12347 | 2023-05-13 09:11:44 | Task       | Sergey Ivanov  | [s.ivanov@company.ru](mailto:s.ivanov@company.ru)     | s.ivanov   |
+
+---
+
+# 🧩 2. SQL script: `checking-jira-tasks.sql`
+
+## 2.1. Full closed task dataset
+
+Creates table `spd_tasks_reporters_full` with:
+
+* Jira statuses,
+* org units (lvl6, lvl8, management unit, legal unit),
+* resolution date.
+
+### 📊 Example
+
+| issue     | status_name | creation_date | resolution_dttm     | type_nm   | login    | management_unit_nm | lvl8_mngt_unit_nm | legal_unit_nm |
+| --------- | ----------- | ------------- | ------------------- | --------- | -------- | ------------------ | ----------------- | ------------- |
+| SPD-12345 | Done        | 2023-05-12    | 2023-05-15 14:11:22 | TCRM Call | i.petrov | Support Group 1    | Contact Center    | Tinkoff Bank  |
+
+---
+
+## 2.2. Monthly closed task count
+
+| y    | mes_num | mes  | tasks_amount |
+| ---- | ------- | ---- | ------------ |
+| 2023 | 5       | May  | 412          |
+| 2023 | 6       | June | 398          |
+
+---
+
+## 2.3. Department-level statistics
+
+| y    | mes_num | mes | lvl6_mngt_unit_nm | management_unit_nm | tasks_amount |
+| ---- | ------- | --- | ----------------- | ------------------ | ------------ |
+| 2023 | 5       | May | Digital Support   | Support Group 1    | 150          |
+
+---
+
+## 2.4. Percentage of closed tasks by department
+
+| y    | mes_num | mes | lvl6_mngt_unit_nm | tasks_amount | percentage |
+| ---- | ------- | --- | ----------------- | ------------ | ---------- |
+| 2023 | 5       | May | Digital Support   | 270          | 65.53%     |
+
+---
+
+## 2.5. Percentage of closed tasks by team
+
+| y    | mes_num | mes | management_unit_nm | tasks_amount | percentage |
+| ---- | ------- | --- | ------------------ | ------------ | ---------- |
+| 2023 | 5       | May | Support Group 1    | 150          | 36.4%      |
+
+---
+
+## 2.6. Open task analytics
+
+Table `spd_tasks_reporters_full_open` categorizes tasks into:
+
+| Jira statuses               | main_status |
+| --------------------------- | ----------- |
+| New, Backlog, Specification | Backlog     |
+| Development, Review, To Do  | In Progress |
+| Others                      | Block       |
+
+---
+
+## 2.7. Backlog task count
+
+| mes | main_status | management_unit_nm | count |
+| --- | ----------- | ------------------ | ----- |
+| May | Backlog     | Support Group 1    | 23    |
+
+---
+
+## 2.8. In Progress task count
+
+| mes | main_status | management_unit_nm | count |
+| --- | ----------- | ------------------ | ----- |
+| May | In Progress | Support Group 1    | 15    |
+
+---
+
+# 🚀 Summary
+
+The project fully automates Jira analytics:
+
+* data extraction,
+* org structure enrichment,
+* closed task calculation,
+* open task tracking,
+* month-by-month reporting,
+* performance contribution by teams and departments.
+
+---
+
+
